@@ -22,7 +22,6 @@ PARAMS = {
 }
 
 class Trader:
-    
     def __init__(self, params=None):
         if params is None:
             params = PARAMS
