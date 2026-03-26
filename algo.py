@@ -96,48 +96,8 @@ class Trader:
                         tomato_ewma = alpha * mid_price + (1 - alpha) * tomato_ewma
 
                 if tomato_ewma is not None:
-                    position = state.position.get('TOMATOES', 0)
-                    limit = 20
-                    
-                    fair_value = round(tomato_ewma)
-                    buy_edge = fair_value - 6 # TOMATOES_SPREAD
-                    sell_edge = fair_value + 6 # TOMATOES_SPREAD
-                    
-                    # Dynamic Inventory Risk Control (Tomatoes)
-                    if position > 12:
-                        buy_edge -= 2
-                        sell_edge -= 1
-                    elif position < -12:
-                        buy_edge += 1
-                        sell_edge += 2
-
-                    # Market Sweeping
-                    if len(order_depth.sell_orders) > 0:
-                        ask_iter = sorted(order_depth.sell_orders.items())
-                        for ask, ask_qty in ask_iter:
-                            if ask <= buy_edge:
-                                vol = min(-ask_qty, limit - position)
-                                if vol > 0:
-                                    orders.append(Order(product, ask, vol))
-                                    position += vol
-
-                    if len(order_depth.buy_orders) > 0:
-                        bid_iter = sorted(order_depth.buy_orders.items(), reverse=True)
-                        for bid, bid_qty in bid_iter:
-                            if bid >= sell_edge:
-                                vol = min(bid_qty, position + limit)
-                                if vol > 0:
-                                    orders.append(Order(product, bid, -vol))
-                                    position -= vol
-                    
-                    # Market Making
-                    buy_vol = limit - position
-                    if buy_vol > 0:
-                        orders.append(Order(product, buy_edge, buy_vol))
-                    
-                    sell_vol = limit + position
-                    if sell_vol > 0:
-                        orders.append(Order(product, sell_edge, -sell_vol))
+                    # Trading for TOMATOES disabled by user request.
+                    pass
 
             result[product] = orders
             
