@@ -153,25 +153,33 @@ class Trader:
 
         return buy_order_volume, sell_order_volume
 
-    # ── Fair value: TOMATOES (dynamic, mean-reverting) ─────────────────
+    # ── Fair value: TOMATOES (midwall of bid/ask walls) ─────────────────
     def tomatoes_fair_value(self, order_depth: OrderDepth, traderObject) -> float:
         if len(order_depth.sell_orders) == 0 or len(order_depth.buy_orders) == 0:
             return None
 
-        best_ask = min(order_depth.sell_orders.keys())
-        best_bid = max(order_depth.buy_orders.keys())
-        mid_price = (best_ask + best_bid) / 2
+        # Bid wall: price level with the largest volume on the buy side
+        bid_wall = max(order_depth.buy_orders.keys(),
+                       key=lambda p: order_depth.buy_orders[p])
+        # Ask wall: price level with the largest volume on the sell side
+        ask_wall = min(order_depth.sell_orders.keys(),
+                       key=lambda p: abs(order_depth.sell_orders[p]))
+        # sell_orders are negative, so largest wall = most negative
+        ask_wall = max(order_depth.sell_orders.keys(),
+                       key=lambda p: abs(order_depth.sell_orders[p]))
+
+        mid_wall = (bid_wall + ask_wall) / 2
 
         # Mean-reversion adjustment
         if traderObject.get("tomatoes_last_price") is not None:
             last_price = traderObject["tomatoes_last_price"]
-            last_returns = (mid_price - last_price) / last_price
+            last_returns = (mid_wall - last_price) / last_price
             pred_returns = last_returns * self.params[Product.TOMATOES]["reversion_beta"]
-            fair = mid_price + (mid_price * pred_returns)
+            fair = mid_wall + (mid_wall * pred_returns)
         else:
-            fair = mid_price
+            fair = mid_wall
 
-        traderObject["tomatoes_last_price"] = mid_price
+        traderObject["tomatoes_last_price"] = mid_wall
         return fair
 
     # ── Wrapper: take ──────────────────────────────────────────────────
