@@ -81,14 +81,14 @@ class Trader:
                 buy_edge = fair_value - 7 # EMERALDS_SPREAD
                 sell_edge = fair_value + 7 # EMERALDS_SPREAD
                 
-                # Apply inventory skewing (reduce_position)
+                # 1. Apply multi-stage inventory skewing
                 buy_edge, sell_edge = self.reduce_position(buy_edge, sell_edge, position)
 
-                # 1. Take profitable orders
+                # 2. Take profitable orders
                 take_orders, position = self.take_best_orders(product, order_depth, buy_edge, sell_edge, position, limit)
                 orders.extend(take_orders)
 
-                # 2. Market make
+                # 3. Market make
                 mm_orders = self.market_make(product, buy_edge, sell_edge, position, limit)
                 orders.extend(mm_orders)
 
