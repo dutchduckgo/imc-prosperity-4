@@ -1,6 +1,7 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
+import jsonpickle
 import numpy as np
 import math
 
@@ -13,6 +14,7 @@ PARAMS = {
         "fair_value": 10000,
         "take_width": 1,
         "clear_width": 0,
+        "default_edge": 7,
     },
     Product.TOMATOES: {
         "take_width": 1,
@@ -112,13 +114,30 @@ class Trader:
         sell_quantity = self.LIMIT[product] + (position - sell_order_volume) 
 
         if position_after_take > 0:
-            reduce_quantity = sum(
+            clear_quantity = sum(
                 volume
                 for price, volume in order_depth.buy_orders.items()
                 if price >= fair_for_ask
             )
             clear_quantity = min(clear_quantity, position_after_take)
-            
+            sell_quantity = min(sell_quantity, clear_quantity)
+            if sell_quantity > 0:
+                orders.append(Order(product, fair_for_ask, -1 * sell_quantity))
+                sell_order_volume += sell_quantity
+
+        if position_after_take < 0:
+            clear_quantity = sum(
+                abs(volume)
+                for price, volume in order_depth.sell_orders.items()
+                if price <= fair_for_bid
+            )
+            clear_quantity = min(clear_quantity, abs(position_after_take))
+            sent_quantity = min(buy_quantity, clear_quantity)
+            if sent_quantity > 0:
+                orders.append(Order(product, fair_for_bid, abs(sent_quantity)))
+                buy_order_volume += abs(sent_quantity)
+
+        return buy_order_volume, sell_order_volume
 
 
     def take_orders(
@@ -150,10 +169,9 @@ class Trader:
 
     
     def run(self, state: TradingState):
-        """Only method required. It takes all buy and sell orders for all
-        symbols as an input, and outputs a list of orders to be sent."""
-
         traderObject = {}
+        if state.traderData != None and state.traderData != "":
+            traderObject = jsonpickle.decode(state.traderData)
 
         result = {}
 
@@ -163,16 +181,40 @@ class Trader:
                 if Product.EMERALDS in state.position
                 else 0
             )
-            emerald_take_orders, _, _ = self.take_orders(
+            emerald_take_orders, buy_order_volume, sell_order_volume = self.take_orders(
                 Product.EMERALDS,
                 state.order_depths[Product.EMERALDS],
                 self.params[Product.EMERALDS]["fair_value"],
                 self.params[Product.EMERALDS]["take_width"],
                 emerald_position,
             )
-            result[Product.EMERALDS] = emerald_take_orders
 
-        traderData = ""
+            emerald_clear_orders = []
+            buy_order_volume, sell_order_volume = self.reduce_position(
+                Product.EMERALDS,
+                self.params[Product.EMERALDS]["fair_value"],
+                self.params[Product.EMERALDS]["clear_width"],
+                emerald_clear_orders,
+                state.order_depths[Product.EMERALDS],
+                emerald_position,
+                buy_order_volume,
+                sell_order_volume,
+            )
+
+            emerald_make_orders = []
+            self.market_make(
+                Product.EMERALDS,
+                emerald_make_orders,
+                self.params[Product.EMERALDS]["fair_value"] - self.params[Product.EMERALDS]["default_edge"],
+                self.params[Product.EMERALDS]["fair_value"] + self.params[Product.EMERALDS]["default_edge"],
+                emerald_position,
+                buy_order_volume,
+                sell_order_volume,
+            )
+
+            result[Product.EMERALDS] = emerald_take_orders + emerald_clear_orders + emerald_make_orders
+
+        traderData = jsonpickle.encode(traderObject)
         conversions = 1
         return result, conversions, traderData
 
